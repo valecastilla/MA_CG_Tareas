@@ -21,9 +21,6 @@ class ConwaysGameOfLife(Model):
         """
         self.grid = OrthogonalMooreGrid((width, height), capacity=1, torus=True) # Create grid, capacity 1 agent per cell, torus takes edges as connected
 
-        # Counter so that the agent status is only updated after the top row is processed
-        self.counter = 48 # Second row index
-
         # Place a cell at each location, with some initialized to
         # ALIVE and some to DEAD.
         for cell in self.grid.all_cells: # For each cell in the grid create a Cell agent

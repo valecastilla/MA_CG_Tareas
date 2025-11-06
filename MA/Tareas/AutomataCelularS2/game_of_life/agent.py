@@ -50,23 +50,23 @@ class Cell(FixedAgent): # Cell hereda de FixedAgent
         # Assume nextState is unchanged, unless changed below.
         self._next_state = self.state
 
-        if self.y < 49:
-            if neighborStates[2] == 1 and neighborStates[4] == 1 and neighborStates[7] == 1:
-                self._next_state = self.DEAD
-            elif neighborStates[2] == 1 and neighborStates[4] == 1 and neighborStates[7] == 0:
-                self._next_state = self.ALIVE
-            elif neighborStates[2] == 1 and neighborStates[4] == 0 and neighborStates[7] == 1:
-                self._next_state = self.DEAD
-            elif neighborStates[2] == 1 and neighborStates[4] == 0 and neighborStates[7] == 0:
-                self._next_state = self.ALIVE
-            elif neighborStates[2] == 0 and neighborStates[4] == 1 and neighborStates[7] == 1:
-                self._next_state = self.ALIVE
-            elif neighborStates[2] == 0 and neighborStates[4] == 1 and neighborStates[7] == 0:
-                self._next_state = self.DEAD
-            elif neighborStates[2] == 0 and neighborStates[4] == 0 and neighborStates[7] == 1:
-                self._next_state = self.ALIVE
-            elif neighborStates[2] == 0 and neighborStates[4] == 0 and neighborStates[7] == 0:
-                self._next_state = self.DEAD
+        
+        if neighborStates[2] == 1 and neighborStates[4] == 1 and neighborStates[7] == 1:
+            self._next_state = self.DEAD
+        elif neighborStates[2] == 1 and neighborStates[4] == 1 and neighborStates[7] == 0:
+            self._next_state = self.ALIVE
+        elif neighborStates[2] == 1 and neighborStates[4] == 0 and neighborStates[7] == 1:
+            self._next_state = self.DEAD
+        elif neighborStates[2] == 1 and neighborStates[4] == 0 and neighborStates[7] == 0:
+            self._next_state = self.ALIVE
+        elif neighborStates[2] == 0 and neighborStates[4] == 1 and neighborStates[7] == 1:
+            self._next_state = self.ALIVE
+        elif neighborStates[2] == 0 and neighborStates[4] == 1 and neighborStates[7] == 0:
+            self._next_state = self.DEAD
+        elif neighborStates[2] == 0 and neighborStates[4] == 0 and neighborStates[7] == 1:
+            self._next_state = self.ALIVE
+        elif neighborStates[2] == 0 and neighborStates[4] == 0 and neighborStates[7] == 0:
+            self._next_state = self.DEAD
 
     def assume_state(self): # Update state to next state
         """Set the state to the new computed state -- computed in step()."""
