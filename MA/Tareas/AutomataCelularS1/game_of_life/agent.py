@@ -40,8 +40,8 @@ class Cell(FixedAgent): # Cell hereda de FixedAgent
         """
 
         # # Discover top 3 cells position in the array returned by neighbors
-        # if self.x == 1 and self.y == 1:  # Top-left corner
-        #     print("1,1 neighbors:", [(n.x, n.y, n.state) for n in self.neighbors])
+        # if self.x == 0 and self.y == 0:  # Top-left corner
+        #     print("0,0 neighbors:", [(n.x, n.y, n.state) for n in self.neighbors])
         # # In the neighbors list, the top 3 cells are at indices 2, 4, 7
 
 
