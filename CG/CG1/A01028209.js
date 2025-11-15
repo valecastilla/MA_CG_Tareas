@@ -1,8 +1,10 @@
 /*
- * Script to draw a complex shape in 2D
- *
+ * Tarea CG 1
+ * Draws a smily face and a pivot on the canvas. 
+ * The face has translation, scale and rotation, this last one is relative to the position of the pivot.
+ * The Pivot can only translate.
  * Valentina Castilla
- * 2025-11-11
+ * 2025-11-14
  */
 
 "use strict";
@@ -44,6 +46,7 @@ void main() {
 }
 `;
 
+// Changed shader to allow objects to be different colors
 const fsGLSL = `#version 300 es
 precision highp float;
 
@@ -94,7 +97,6 @@ const objects = {
         z: 0,
       },
     },
-    //color: [254 / 255, 128 / 255, 200 / 255, 1],
   },
 };
 
@@ -121,8 +123,6 @@ function main() {
 
   // Create a polygon with the center at a specific location
   // Face
-  //const arraysF = generateData(sides, centerX, centerY, radius);
-  // pass GUI color so face uses the current color
   const arraysF = generateDataFace(radius, centerX, centerY, objects.model.color);
   const bufferInfoF = twgl.createBufferInfoFromArrays(gl, arraysF);
   const vaoF = twgl.createVAOFromBufferInfo(gl, programInfo, bufferInfoF);
@@ -132,9 +132,8 @@ function main() {
   const bufferInfoP = twgl.createBufferInfoFromArrays(gl, arraysP);
   const vaoP = twgl.createVAOFromBufferInfo(gl, programInfo, bufferInfoP);
 
-  // Draw face
+  // Draw face and Pivot
   drawScene(gl, vaoF, programInfo, bufferInfoF, vaoP, bufferInfoP);
-  //drawScene(gl, vaoF, programInfo, bufferInfoF);
 
 }
 
@@ -155,23 +154,23 @@ function drawScene(gl, vao, programInfo, bufferInfo, vaoP, bufferInfoP) {
     objects.modelP.transforms.t.y,
   ];
 
-  // Create transform matrices
+  // Create transform matrices Face
   const scaMat = M3.scale(scale);
   const rotMat = M3.rotation(angle_radians);
   const traMat = M3.translation(translate);
 
-  
+  // Create transform matrices Pivot
   const traMatP = M3.translation(translateP);
 
-  // Composite for face (rotate around pivot)
   // Pivot base coordinates used when the geometry was created in main()
-  const pivotBase = [0, 0]; // same centerXP, centerYP used in main()
-  const pivotCurrentPos = [
+  const pivotBase = [0, 0]; 
+  // Calculate pivot's current pos
+  const pivotCurrentPos = [ 
     pivotBase[0] + objects.modelP.transforms.t.x,
     pivotBase[1] + objects.modelP.transforms.t.y,
   ];
 
-  // Translate to pivot, rotate, translate back (then apply face translation)
+  // Create matrix to ranslate to pivot and translate back 
   const toPivot = M3.translation([-pivotCurrentPos[0], -pivotCurrentPos[1]]);
   const backFromPivot = M3.translation([pivotCurrentPos[0], pivotCurrentPos[1]]);
 
@@ -188,7 +187,7 @@ function drawScene(gl, vao, programInfo, bufferInfo, vaoP, bufferInfoP) {
     u_transforms: transforms,
   };
 
-  // Composite for pivot
+  // Multiply just translate for pivot
   let transformsP = M3.identity();
   transformsP = M3.multiply(traMatP, transformsP);
 
@@ -296,7 +295,7 @@ function generateDataFace(r, centerX = 0, centerY = 0, color = [1, 0.84, 0, 1]) 
     arrays.indices.data.push(base, base + 1, base + 2); // create triangle
   };
 
-  // Eyes
+  // Eyes, define coords
   const eyeOffsetX = r / 3;
   const eyeOffsetY = r / 4;
   const eyeSize = r / 10;
@@ -308,7 +307,7 @@ function generateDataFace(r, centerX = 0, centerY = 0, color = [1, 0.84, 0, 1]) 
   addTriangle(leftX - eyeSize, leftY + eyeSize, leftX + eyeSize, leftY + eyeSize, leftX, leftY - eyeSize);
   addTriangle(rightX - eyeSize, rightY + eyeSize, rightX + eyeSize, rightY + eyeSize, rightX, rightY - eyeSize);
 
-  // Mouth
+  // Mouth, define coords
   const mouthOffsetY = r * 0.35;
   const mouthWidth = r * 1;
   const mouthHeight = r * 0.20;
