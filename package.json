@@ -1,0 +1,17 @@
+{
+  "name": "ma_cg_tareas",
+  "version": "1.0.0",
+  "description": "",
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "lil-gui": "^0.21.0",
+    "twgl": "^7.0.3",
+    "twgl-base.js": "^5.5.3"
+  }
+}
