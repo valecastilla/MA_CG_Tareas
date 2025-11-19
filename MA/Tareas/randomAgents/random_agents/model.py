@@ -1,7 +1,7 @@
 from mesa import Model
 from mesa.discrete_space import OrthogonalMooreGrid
 
-from .agent import RandomAgent, ObstacleAgent
+from .agent import ChargingStationAgent, RandomAgent, ObstacleAgent, TrashAgent
 
 class RandomModel(Model):
     """
@@ -9,11 +9,16 @@ class RandomModel(Model):
     Args:
         num_agents: Number of agents in the simulation
         height, width: The size of the grid to model
+        num_obstacles: Number of obstacle agents in the simulation
     """
-    def __init__(self, num_agents=10, width=8, height=8, seed=42):
+    def __init__(self, num_agents=10, num_obstacles=10, num_trash=10, width=8, height=8, seed=42):
 
         super().__init__(seed=seed)
         self.num_agents = num_agents
+        self.num_obstacles = num_obstacles
+        self.num_trash = num_trash
+        # Track how many trash items have been collected so far
+        self.num_collected = 0
         self.seed = seed
         self.width = width
         self.height = height
@@ -30,14 +35,46 @@ class RandomModel(Model):
         for _, cell in enumerate(self.grid):
             if cell.coordinate in border:
                 ObstacleAgent(self, cell=cell)
+            
 
         RandomAgent.create_agents(
             self,
             self.num_agents,
-            cell=self.random.choices(self.grid.empties.cells, k=self.num_agents)
+            # Agent starting position at 1,1
+            cell=self.grid[1,1]
         )
 
-        self.running = True
+        ObstacleAgent.create_agents(
+            self,
+            self.num_obstacles,
+            cell=self.random.choices(self.grid.empties.cells, k=self.num_obstacles)
+        )
+
+        TrashAgent.create_agents(
+            self,
+            self.num_trash,
+            cell=self.random.choices(self.grid.empties.cells, k=self.num_trash)
+        )
+
+        # Find the cell where the agent spawns to create the charging station there
+        charging_cell = None
+        for c in self.grid.all_cells:
+            contents = c.agents  # Get agents in the cell
+            for a in contents:
+                if isinstance(a, RandomAgent): # If there is a RandomAgent in the cell
+                    charging_cell = c # Assign that cell
+                    break
+            if charging_cell is not None: # If we have found the cell, break out of the loop, just one agent in S1
+                break
+
+        ChargingStationAgent.create_agents(
+            self,
+            1,
+            cell=charging_cell,
+        )
+
+        
+        self.running = True # Indicate that the model is running
 
     def step(self):
         '''Advance the model by one step.'''

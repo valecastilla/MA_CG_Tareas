@@ -1,4 +1,4 @@
-from random_agents.agent import RandomAgent, ObstacleAgent
+from random_agents.agent import RandomAgent, ObstacleAgent, TrashAgent, ChargingStationAgent
 from random_agents.model import RandomModel
 
 from mesa.visualization import (
@@ -24,6 +24,14 @@ def random_portrayal(agent):
         portrayal.color = "gray"
         portrayal.marker = "s"
         portrayal.size = 100
+    elif isinstance(agent, TrashAgent):
+        portrayal.color = "green"
+        portrayal.marker = "s"
+        portrayal.size = 50
+    elif isinstance(agent, ChargingStationAgent):
+        portrayal.color = "blue"
+        portrayal.marker = "s"
+        portrayal.size = 50
 
     return portrayal
 
@@ -36,7 +44,9 @@ model_params = {
         "value": 42,
         "label": "Random Seed",
     },
-    "num_agents": Slider("Number of agents", 10, 1, 50),
+    "num_agents": Slider("Number of agents", 1, 1, 50),
+    "num_obstacles": Slider("Number of obstacles", 5, 1, 100), # For obstacle min 0 max 100 and default 10 
+    "num_trash": Slider("Number of trash", 10, 1, 100), # For trash min 0 max 100 and default 10
     "width": Slider("Grid width", 28, 1, 50),
     "height": Slider("Grid height", 28, 1, 50),
 }
@@ -44,6 +54,8 @@ model_params = {
 # Create the model using the initial parameters from the settings
 model = RandomModel(
     num_agents=model_params["num_agents"].value,
+    num_obstacles=model_params["num_obstacles"].value,
+    num_trash=model_params["num_trash"].value,
     width=model_params["width"].value,
     height=model_params["height"].value,
     seed=model_params["seed"]["value"]
