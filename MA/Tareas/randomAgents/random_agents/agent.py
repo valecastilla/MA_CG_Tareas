@@ -51,37 +51,47 @@ class RandomAgent(CellAgent):
                     c for c in self.cell.neighborhood.select(lambda cell: True) if is_safe(c)
                 ]
                 if safe_neighbors:
-                    self.cell = self.random.choice(safe_neighbors)
-                    print(f"Moved to {self.cell.coordinate} from (1,1) due to blockage at (2,2)")
-                    self.batteryLevel -= 1
+                    dest = self.model.grid[self.cell.coordinate[0] + 1, self.cell.coordinate[1]]
+                    if (dest) in safe_neighbors: 
+                        self.cell = dest
+                        self.batteryLevel -= 1
+                    else:
+                        dest = self.model.grid[self.cell.coordinate[0], self.cell.coordinate[1] + 1]
+                        if (dest) in safe_neighbors:
+                            self.cell = dest
+                            self.batteryLevel -= 1
+                        else: 
+                            self.cell = self.random.choice(safe_neighbors)
+                            self.batteryLevel -= 1
+                        
         else:
-            # Handle special return / target flags first
             curr_x, curr_y = self.cell.coordinate
             # If we were blocked when trying to reach (2,2), try to reach row 2
             if self.agentMap.get('TargetRow2'):
                 if curr_y != 2:
-                    step_y = 1 if 2 > curr_y else -1
+                    step_y = 1 if 2 > curr_y else -1 # If current row is smaller that target go up, else down
                     dest = self.model.grid[curr_x, curr_y + step_y]
                     if is_safe(dest):
                         self.cell = dest
-                        print(f"Moved to {self.cell.coordinate} while targeting row 2")
                         self.batteryLevel -= 1
                         return
                 else:
-                    # reached row 2
+                    # Reached row 2
                     self.agentMap.pop('TargetRow2', None)
 
             # If we need to return to a previous row after avoidance
-            if self.agentMap.get('ReturnRow') is not None and not self.cleaning:
+            if self.agentMap.get('ReturnRow') is not None:
                 target_row = self.agentMap['ReturnRow']
                 if curr_y != target_row:
-                    step_y = 1 if target_row > curr_y else -1
+                    step_y = 1 if target_row > curr_y else -1 # If current row is smaller that target go up, else down
+                    # Depending on direction choose optimal cell
+                    #if self.direction > 0:
+                     #   step_x = 
                     dest = self.model.grid[curr_x, curr_y + step_y]
                     if is_safe(dest):
                         self.cell = dest
-                        print(f"Returning to row {target_row}, moved to {self.cell.coordinate}")
                         self.batteryLevel -= 1
-                        # If we've returned to the row, clear the flag
+                        # If we've returned to the row
                         if self.cell.coordinate[1] == target_row:
                             self.agentMap.pop('ReturnRow', None)
                         return
@@ -126,52 +136,51 @@ class RandomAgent(CellAgent):
 
             else:
                 next_x = self.cell.coordinate[0] + self.direction
-                # If next_x is out of bounds, handle side logic (change direction and try move vertically)
                 if next_x < 2 or next_x >= self.model.width - 2:
                     self.direction = -self.direction
                     newX = self.cell.coordinate[0]
                     newY = self.cell.coordinate[1] + 2
-                    # clamp newY
+                    # Handle top and bottom borders
                     newY = max(0, min(self.model.height - 1, newY))
                     dest = self.model.grid[newX, newY]
                     if is_safe(dest):
                         self.cell = dest
-                        print(f"Moved to {self.cell.coordinate} while targeting row {newY}")
                         self.batteryLevel -= 1
                     else:
                         safe_neighbors = [
                             c for c in self.cell.neighborhood.select(lambda cell: cell.is_empty or any(isinstance(a, TrashAgent) for a in getattr(cell, 'agents', []))) if is_safe(c)
                         ]
                         if safe_neighbors:
-                            # store return row so we can go back after avoiding
+                            # Store return row so we can go back after avoiding
                             self.agentMap['ReturnRow'] = self.cell.coordinate[1]
                             self.cell = self.random.choice(safe_neighbors)
-                            print(f"Moved to {self.cell.coordinate} while avoiding obstacle")
                             self.batteryLevel -= 1
                 else:
                     dest = self.model.grid[next_x, self.cell.coordinate[1]]
                     if is_safe(dest):
                         self.cell = dest
-                        print(f"Moved to {self.cell.coordinate} while moving horizontally")
                         self.batteryLevel -= 1
                     else:
-                        # obstacle in front: remember current row and pick a safe neighbor to avoid
+                        # If obstacle remember current row and pick a safe neighbor to avoid
                         self.agentMap['ReturnRow'] = self.cell.coordinate[1]
                         safe_neighbors = [
                             c for c in self.cell.neighborhood.select(lambda cell: True) if is_safe(c)
                         ]
                         if safe_neighbors:
-                            self.cell = self.random.choice(safe_neighbors)
-                            print(f"Moved to {self.cell.coordinate} while avoiding obstacle")
-                            self.batteryLevel -= 1        
+                            dest = self.model.grid[self.cell.coordinate[0] + self.direction, self.cell.coordinate[1] - 1]  # Try avoiding from bottom
+                            if is_safe(dest):
+                                self.cell = dest
+                                self.batteryLevel -= 1
+                            else:
+                                dest = self.model.grid[self.cell.coordinate[0] + self.direction, self.cell.coordinate[1] + 1]
+                                if is_safe(dest):
+                                    self.cell == dest
+                                    self.batteryLevel -= 1
+                                else:
+                                    self.cell = self.random.choice(safe_neighbors)
+                                    self.batteryLevel -= 1   
 
-
-        
         print(f"Battery level: {self.batteryLevel}%")
-
-
-
-
 
         pass
 
@@ -237,13 +246,20 @@ class RandomAgent(CellAgent):
         Determines the new direction it will take, and then moves
         """
         self.saveInfo()
-        self.move()
-
         # Longest path it would take to reach charging station
-        if self.batteryLevel <= self.model.width + self.model.height: # Max amount needed to reach charging station from any point
+        if self.batteryLevel <= self.model.width + self.model.height and not self.needToCharge: # Max amount needed to reach charging station from any point
             self.agentMap['LastPositionCharge'] = self.cell.coordinate
+            print(self.agentMap["LastPositionCharge"])
             self.needToCharge = True
             self.charging()
+        elif self.needToCharge:
+            self.charging()
+        elif self.needToReturn:
+            self.returning()
+        else:
+            self.move()
+
+        
 
 
 class ObstacleAgent(FixedAgent):
