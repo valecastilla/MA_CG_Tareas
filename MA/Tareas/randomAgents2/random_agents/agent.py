@@ -17,6 +17,8 @@ class RandomAgent(CellAgent):
         self.cell = cell
         self.agentMap = {}
         self.direction = 1
+        # vertical zigzag direction: -1 moves up, +1 moves down
+        self.zig_vertical = -1
         self.needToCharge = False
         self.needToReturn = False
         self.cleaning = False
@@ -37,6 +39,44 @@ class RandomAgent(CellAgent):
         # Find cells with no obstacles
         def is_safe(cell):
             return not any(isinstance(a, ObstacleAgent) for a in getattr(cell, 'agents', []))
+
+        # If agent marked for initial zigzag upward, perform prioritized moves
+        if self.agentMap.get('InitialZig'):
+            curr_x, curr_y = self.cell.coordinate
+            # If already at top row, clear flag
+            if curr_y == 0:
+                self.agentMap.pop('InitialZig', None)
+            else:
+                # Try move horizontally first (makes progress), else move up one
+                nx = curr_x + self.direction
+                if 0 <= nx < self.model.width:
+                    dest = self.model.grid[nx, curr_y]
+                    if is_safe(dest):
+                        self.cell = dest
+                        self.batteryLevel -= 1
+                        return
+                # If horizontal blocked/out-of-bounds, reverse direction and try move up one
+                self.direction = -self.direction
+                up_y = max(0, curr_y - 1)
+                dest = self.model.grid[curr_x, up_y]
+                if is_safe(dest):
+                    self.cell = dest
+                    self.batteryLevel -= 1
+                    # If reached top, clear flag
+                    if self.cell.coordinate[1] == 0:
+                        self.agentMap.pop('InitialZig', None)
+                    return
+                # fallback: pick any safe neighbor that reduces row (closer to top)
+                safe_neighbors = [
+                    c for c in self.cell.neighborhood.select(lambda cell: True) if is_safe(c)
+                ]
+                if safe_neighbors:
+                    safe_neighbors.sort(key=lambda c: c.coordinate[1])  # prefer smaller y (towards top)
+                    self.cell = safe_neighbors[0]
+                    self.batteryLevel -= 1
+                    if self.cell.coordinate[1] == 0:
+                        self.agentMap.pop('InitialZig', None)
+                    return
 
         # If currently at (1,1) try to move to (2,2) unless blocked
         if self.cell.coordinate == (1, 1):
@@ -136,12 +176,19 @@ class RandomAgent(CellAgent):
 
             else:
                 next_x = self.cell.coordinate[0] + self.direction
+                # Reverse direction if top or bottom are reached
                 if next_x < 2 or next_x >= self.model.width - 2:
                     self.direction = -self.direction
                     newX = self.cell.coordinate[0]
-                    newY = self.cell.coordinate[1] + 2
-                    # Handle top and bottom borders
-                    newY = max(0, min(self.model.height - 1, newY))
+                    newY = self.cell.coordinate[1] + (2 * self.zig_vertical)
+                    # If we hit the top, switch to going down, if bottom, switch to going up
+                    if newY <= 0:
+                        newY = 0
+                        self.zig_vertical = 1
+                    elif newY >= self.model.height - 1:
+                        newY = self.model.height - 1
+                        self.zig_vertical = -1
+
                     dest = self.model.grid[newX, newY]
                     if is_safe(dest):
                         self.cell = dest
@@ -174,11 +221,11 @@ class RandomAgent(CellAgent):
                             else:
                                 dest = self.model.grid[self.cell.coordinate[0] + self.direction, self.cell.coordinate[1] + 1]
                                 if is_safe(dest):
-                                    self.cell == dest
+                                    self.cell = dest
                                     self.batteryLevel -= 1
                                 else:
                                     self.cell = self.random.choice(safe_neighbors)
-                                    self.batteryLevel -= 1   
+                                    self.batteryLevel -= 1
 
         print(f"Battery level: {self.batteryLevel}%")
 
@@ -208,17 +255,81 @@ class RandomAgent(CellAgent):
     # Add obstacles avoidance
     def moveToPoint(self, point): # point is a tuple (x,y)
         print("Moving to point state")
-        newX = self.cell.coordinate[0]
-        newY = self.cell.coordinate[1]
-        if newX < point[0]:
-            newX = newX + 1
-        elif newX > point[0]:
-            newX = newX - 1
-        if newY < point[1]:
-            newY = newY + 1
-        elif newY > point[1]:
-            newY = newY - 1
-        self.cell = self.model.grid[newX, newY]
+        curr_x, curr_y = self.cell.coordinate
+
+        # Sign funcrion to determine direction
+        def sign(v): 
+            return 0 if v == 0 else (1 if v > 0 else -1)
+
+        # Check if coordinates are in grid bounds
+        def in_bounds(x, y):
+            return 0 <= x < self.model.width and 0 <= y < self.model.height
+
+        # Check if no obstacles in cell
+        def is_safe(cell):
+            return not any(isinstance(a, ObstacleAgent) for a in getattr(cell, 'agents', []))
+
+        dx = sign(point[0] - curr_x)
+        dy = sign(point[1] - curr_y)
+
+        # Build prioritized candidate moves, to optimize getting to point
+        candidates = []
+        primary = (curr_x + dx, curr_y + dy)
+        candidates.append(primary)
+
+        # Depending on which axis needs movement add preference
+        if dx != 0:
+            candidates.append((curr_x + dx, curr_y))
+        if dy != 0:
+            candidates.append((curr_x, curr_y + dy))
+
+        # Depending on vertical direction prefer top ot bottom cells
+        if dy != 0:
+            candidates.extend([
+                (curr_x - 1, curr_y + dy),
+                (curr_x + 1, curr_y + dy),
+            ])
+
+        # Depending on horizontal direction prefer left or right cells
+        if dx != 0:
+            candidates.extend([
+                (curr_x + dx, curr_y - 1),
+                (curr_x + dx, curr_y + 1),
+            ])
+
+        # Remove duplicate candidates
+        seen = set() # set is ude to keep track of visited coordinates
+        uniq_candidates = [] # Avoid duplicates 
+        for x, y in candidates:
+            if (x, y) not in seen: 
+                seen.add((x, y))
+                uniq_candidates.append((x, y))
+
+        # Pick the first safe candidate
+        for x, y in uniq_candidates:
+            if not in_bounds(x, y):
+                continue
+            cell = self.model.grid[x, y]
+            if is_safe(cell):
+                self.cell = cell
+                return
+
+        # If no candidates are safe, just choose a random safe neighbor
+        safe_neighbors = [
+            c for c in self.cell.neighborhood.select(lambda cell: True) if is_safe(c)
+        ]
+        if safe_neighbors:
+            # Prefer neighbors that move closer to the target, witgh Manhattan distance
+            def manh(c):
+                x, y = c.coordinate
+                return abs(x - point[0]) + abs(y - point[1]) # Manhattan distance
+
+            safe_neighbors.sort(key=manh)
+            self.cell = safe_neighbors[0]
+            return
+
+        # If no safe neighbors, do nothing
+        return
 
     def returning(self):
         print("Returning state")
@@ -235,6 +346,17 @@ class RandomAgent(CellAgent):
     def saveInfo(self):
         # Save the agent's current position in the agentMap
         # Look through all grid cells to find the charging station's position.
+        # If the agent already has a charging station assigned, keep it.
+        if 'ChargingStation' in self.agentMap:
+            return
+
+        # Prefer a charging station in the agent's current cell
+        for a in getattr(self.cell, 'agents', []):
+            if isinstance(a, ChargingStationAgent):
+                self.agentMap['ChargingStation'] = a.cell.coordinate
+                return
+
+        # Fallback: search the grid for any charging station (legacy behavior)
         for cell in getattr(self.model, 'grid').all_cells:
             for a in getattr(cell, 'agents', []):
                 if isinstance(a, ChargingStationAgent):
@@ -286,19 +408,11 @@ class TrashAgent(FixedAgent):
     def __init__(self, model, cell):
         super().__init__(model)
         self.cell=cell
-        self.num_collected = 0
 
     def collected(self):
-        # Remove the trash from the grid/schedule, then notify the model
-        # so the global collected count increments once.
-        self.remove()
-        # Increment model-level collected counter (initialize if missing)
-        if not hasattr(self.model, 'num_collected'):
-            self.model.num_collected = 0
-        self.model.num_collected += 1
-        # If we've collected all trash items, stop the simulation
-        if getattr(self.model, 'num_collected', 0) >= getattr(self.model, 'num_trash', 0):
-            self.model.running = False
+        # Remove the trash agent safely: only remove if it's still present in its cell
+        if hasattr(self, 'cell') and self in getattr(self.cell, 'agents', []):
+            self.remove()
 
     def step(self):
         # Define condition for being collected

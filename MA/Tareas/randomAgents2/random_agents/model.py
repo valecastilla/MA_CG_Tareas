@@ -30,6 +30,8 @@ class RandomModel(Model):
         model_reporters = {
             "RandomAgent": lambda m: sum(1 for a in m.agents if isinstance(a, RandomAgent)),
             "TrashAgent": lambda m: sum(1 for a in m.agents if isinstance(a, TrashAgent)),
+            # Steps left until forced stop
+            "StepsLeft": lambda m: max(0, getattr(m, 'max_steps', 0) - getattr(m, 'steps', 0)),
         }
 
         self.datacollector = DataCollector(model_reporters)
@@ -50,7 +52,7 @@ class RandomModel(Model):
             self,
             self.num_agents,
             # Agent starting position at 1,1
-            cell=self.grid[1,1]
+            cell=self.random.choices(self.grid.empties.cells, k=self.num_agents)
         )
 
         ObstacleAgent.create_agents(
@@ -65,37 +67,44 @@ class RandomModel(Model):
             cell=self.random.choices(self.grid.empties.cells, k=self.num_trash)
         )
 
-        # Find the cell where the agent spawns to create the charging station there
-        charging_cell = None
-        for c in self.grid.all_cells:
-            contents = c.agents  # Get agents in the cell
-            for a in contents:
-                if isinstance(a, RandomAgent): # If there is a RandomAgent in the cell
-                    charging_cell = c # Assign that cell
-                    break
-            if charging_cell is not None: # If we have found the cell, break out of the loop, just one agent in S1
-                break
-
-        ChargingStationAgent.create_agents(
-            self,
-            1,
-            cell=charging_cell,
-        )
+        # Create one charging station for each RandomAgent and assign it to the agent
+        for agent in list(self.agents):
+            if isinstance(agent, RandomAgent):
+                # create a charging station at the agent's current cell
+                station = ChargingStationAgent(self, cell=agent.cell)
+                # assign the station coordinate to the agent so it will use its own station
+                agent.agentMap['ChargingStation'] = station.cell.coordinate
+                # mark agent to perform initial zigzag upward until top border
+                agent.agentMap['InitialZig'] = True
 
         
+        # step counter to allow stopping after a fixed number of steps
+        self.steps = 0
+        self.max_steps = 500
+
         self.running = True # Indicate that the model is running
 
     def step(self):
         '''Advance the model by one step.'''
+        # Stop if no trash remains
+        if sum(1 for a in self.agents if isinstance(a, TrashAgent)) == 0:
+            self.running = False
+            return
+
         self.agents.shuffle_do("step")
-        # collect model-level data for plotting
+
+        # Collect data
         try:
             self.datacollector.collect(self)
         except Exception:
             pass
 
+        # Increment step counter and stop if reached max
+        self.steps += 1
+        if self.steps >= getattr(self, 'max_steps', 500):
+            self.running = False
+
     @staticmethod
     def count_type(model, typeAgent):
         """Helper method to count trees in a given condition in a given model."""
-        # Fallback helper: count agents by class name
         return sum(1 for a in model.agents if a.__class__.__name__ == typeAgent)
