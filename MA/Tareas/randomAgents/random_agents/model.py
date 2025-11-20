@@ -1,4 +1,5 @@
 from mesa import Model
+from mesa.datacollection import DataCollector
 from mesa.discrete_space import OrthogonalMooreGrid
 
 from .agent import ChargingStationAgent, RandomAgent, ObstacleAgent, TrashAgent
@@ -24,6 +25,17 @@ class RandomModel(Model):
         self.height = height
 
         self.grid = OrthogonalMooreGrid([width, height], torus=False)
+
+        # Set up data collection
+        model_reporters = {
+            "RandomAgent": lambda m: self.count_type(m, "RandomAgent"),
+            "TrashAgent": lambda m: self.count_type(m, "TrashAgent"),
+        }
+
+        print("Trash")
+        print(self.count_type(self, "TrashAgent")),
+
+        self.datacollector = DataCollector(model_reporters)
 
         # Identify the coordinates of the border of the grid
         border = [(x,y)
@@ -79,3 +91,8 @@ class RandomModel(Model):
     def step(self):
         '''Advance the model by one step.'''
         self.agents.shuffle_do("step")
+
+    @staticmethod
+    def count_type(model, typeAgent):
+        """Helper method to count trees in a given condition in a given model."""
+        return len(model.agents.select(lambda x: x.isinstance(object, type) == typeAgent))
