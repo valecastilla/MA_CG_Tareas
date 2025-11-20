@@ -5,9 +5,11 @@ from mesa.visualization import (
     Slider,
     SolaraViz,
     make_space_component,
+    make_plot_component,
 )
 
 from mesa.visualization.components import AgentPortrayalStyle
+
 
 def random_portrayal(agent):
     if agent is None:
@@ -51,6 +53,17 @@ model_params = {
     "height": Slider("Grid height", 28, 1, 50),
 }
 
+def post_process_space(ax):
+    ax.set_aspect("equal")
+
+def post_process_lines(ax):
+    ax.legend(loc="center left", bbox_to_anchor=(1, 0.9))
+
+lineplot_component = make_plot_component(
+    {"RandomAgent": "tab:red", "TrashAgent": "tab:green"},
+    post_process=post_process_lines
+)
+
 # Create the model using the initial parameters from the settings
 model = RandomModel(
     num_agents=model_params["num_agents"].value,
@@ -69,7 +82,7 @@ space_component = make_space_component(
 
 page = SolaraViz(
     model,
-    components=[space_component],
+    components=[space_component, lineplot_component],
     model_params=model_params,
     name="Random Model",
 )
