@@ -27,7 +27,12 @@ class RandomAgent(CellAgent):
         except Exception:
             half = self.model.height / 2
 
-        if self.cell.coordinate[1] < half:
+
+        # Roombas on top half go downwards, bottom half go upwards
+        # Roombas in the middle go to a random direction
+        if self.cell.coordinate[1] < half + 5 and self.cell.coordinate[1] > half - 5:
+            self.upDown = self.random.choice([-1, 1])
+        elif self.cell.coordinate[1] < half:
             self.upDown = -1
         else:
             self.upDown = 1
