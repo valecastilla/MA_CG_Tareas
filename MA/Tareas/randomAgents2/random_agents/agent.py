@@ -17,12 +17,20 @@ class RandomAgent(CellAgent):
         self.cell = cell
         self.agentMap = {}
         self.direction = 1
-        # vertical zigzag direction: -1 moves up, +1 moves down
-        self.zig_vertical = -1
         self.needToCharge = False
         self.needToReturn = False
         self.cleaning = False
         self.batteryLevel = 100  # Battery level starts at 100%
+
+        try:
+            half = int(self.model.height) // 2
+        except Exception:
+            half = self.model.height / 2
+
+        if self.cell.coordinate[1] < half:
+            self.upDown = -1
+        else:
+            self.upDown = 1
 
     def move(self):
         """
@@ -39,44 +47,6 @@ class RandomAgent(CellAgent):
         # Find cells with no obstacles
         def is_safe(cell):
             return not any(isinstance(a, ObstacleAgent) for a in getattr(cell, 'agents', []))
-
-        # If agent marked for initial zigzag upward, perform prioritized moves
-        if self.agentMap.get('InitialZig'):
-            curr_x, curr_y = self.cell.coordinate
-            # If already at top row, clear flag
-            if curr_y == 0:
-                self.agentMap.pop('InitialZig', None)
-            else:
-                # Try move horizontally first (makes progress), else move up one
-                nx = curr_x + self.direction
-                if 0 <= nx < self.model.width:
-                    dest = self.model.grid[nx, curr_y]
-                    if is_safe(dest):
-                        self.cell = dest
-                        self.batteryLevel -= 1
-                        return
-                # If horizontal blocked/out-of-bounds, reverse direction and try move up one
-                self.direction = -self.direction
-                up_y = max(0, curr_y - 1)
-                dest = self.model.grid[curr_x, up_y]
-                if is_safe(dest):
-                    self.cell = dest
-                    self.batteryLevel -= 1
-                    # If reached top, clear flag
-                    if self.cell.coordinate[1] == 0:
-                        self.agentMap.pop('InitialZig', None)
-                    return
-                # fallback: pick any safe neighbor that reduces row (closer to top)
-                safe_neighbors = [
-                    c for c in self.cell.neighborhood.select(lambda cell: True) if is_safe(c)
-                ]
-                if safe_neighbors:
-                    safe_neighbors.sort(key=lambda c: c.coordinate[1])  # prefer smaller y (towards top)
-                    self.cell = safe_neighbors[0]
-                    self.batteryLevel -= 1
-                    if self.cell.coordinate[1] == 0:
-                        self.agentMap.pop('InitialZig', None)
-                    return
 
         # If currently at (1,1) try to move to (2,2) unless blocked
         if self.cell.coordinate == (1, 1):
@@ -176,19 +146,19 @@ class RandomAgent(CellAgent):
 
             else:
                 next_x = self.cell.coordinate[0] + self.direction
-                # Reverse direction if top or bottom are reached
+                next_y = self.cell.coordinate[1]
+
+                if next_y <= 2:
+                    self.upDown = 1
+                elif next_y >= self.model.height - 3:
+                    self.upDown = -1
+                
                 if next_x < 2 or next_x >= self.model.width - 2:
                     self.direction = -self.direction
                     newX = self.cell.coordinate[0]
-                    newY = self.cell.coordinate[1] + (2 * self.zig_vertical)
-                    # If we hit the top, switch to going down, if bottom, switch to going up
-                    if newY <= 0:
-                        newY = 0
-                        self.zig_vertical = 1
-                    elif newY >= self.model.height - 1:
-                        newY = self.model.height - 1
-                        self.zig_vertical = -1
-
+                    newY = self.cell.coordinate[1] + (2 * self.upDown)
+                    # Handle top and bottom borders
+                    newY = max(0, min(self.model.height - 1, newY))
                     dest = self.model.grid[newX, newY]
                     if is_safe(dest):
                         self.cell = dest
@@ -221,15 +191,15 @@ class RandomAgent(CellAgent):
                             else:
                                 dest = self.model.grid[self.cell.coordinate[0] + self.direction, self.cell.coordinate[1] + 1]
                                 if is_safe(dest):
-                                    self.cell = dest
+                                    self.cell == dest
                                     self.batteryLevel -= 1
                                 else:
                                     self.cell = self.random.choice(safe_neighbors)
-                                    self.batteryLevel -= 1
+                                    self.batteryLevel -= 1   
 
         print(f"Battery level: {self.batteryLevel}%")
 
-        pass
+        pass 
 
     def charging(self):
         # Move towards the charging station
@@ -246,9 +216,6 @@ class RandomAgent(CellAgent):
                     self.needToCharge = False
                     self.needToReturn = True
                     self.returning()
-
-    def cleaning(self):
-        print("Cleaning state")
     
 
     # Use chevysev distance to move to a specific point
@@ -344,24 +311,16 @@ class RandomAgent(CellAgent):
                 self.move()      
 
     def saveInfo(self):
-        # Save the agent's current position in the agentMap
-        # Look through all grid cells to find the charging station's position.
-        # If the agent already has a charging station assigned, keep it.
+        # Save the agent's current position in the agentMap if there is no charging station recorded
+        
         if 'ChargingStation' in self.agentMap:
             return
-
-        # Prefer a charging station in the agent's current cell
+        
         for a in getattr(self.cell, 'agents', []):
             if isinstance(a, ChargingStationAgent):
                 self.agentMap['ChargingStation'] = a.cell.coordinate
                 return
 
-        # Fallback: search the grid for any charging station (legacy behavior)
-        for cell in getattr(self.model, 'grid').all_cells:
-            for a in getattr(cell, 'agents', []):
-                if isinstance(a, ChargingStationAgent):
-                    self.agentMap['ChargingStation'] = a.cell.coordinate
-                    return
                 
     def noBattery(self):
         print("No battery state")

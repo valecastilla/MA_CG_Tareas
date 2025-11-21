@@ -70,17 +70,15 @@ class RandomModel(Model):
         # Create one charging station for each RandomAgent and assign it to the agent
         for agent in list(self.agents):
             if isinstance(agent, RandomAgent):
-                # create a charging station at the agent's current cell
+                # Create a charging station at the agent's current cell
                 station = ChargingStationAgent(self, cell=agent.cell)
-                # assign the station coordinate to the agent so it will use its own station
+                # Assign the station coordinate to the agent so it will use its own station
                 agent.agentMap['ChargingStation'] = station.cell.coordinate
-                # mark agent to perform initial zigzag upward until top border
-                agent.agentMap['InitialZig'] = True
 
         
-        # step counter to allow stopping after a fixed number of steps
+        # Step counter to allow stopping after a fixed number of steps
         self.steps = 0
-        self.max_steps = 500
+        self.max_steps = 1000
 
         self.running = True # Indicate that the model is running
 
@@ -101,7 +99,7 @@ class RandomModel(Model):
 
         # Increment step counter and stop if reached max
         self.steps += 1
-        if self.steps >= getattr(self, 'max_steps', 500):
+        if self.steps >= getattr(self, 'max_steps', 1000):
             self.running = False
 
     @staticmethod

@@ -17,6 +17,7 @@ class RandomAgent(CellAgent):
         self.cell = cell
         self.agentMap = {}
         self.direction = 1
+        self.upDown = 1
         self.needToCharge = False
         self.needToReturn = False
         self.cleaning = False
@@ -199,26 +200,88 @@ class RandomAgent(CellAgent):
                     self.needToCharge = False
                     self.needToReturn = True
                     self.returning()
-
-    def cleaning(self):
-        print("Cleaning state")
     
 
     # Use chevysev distance to move to a specific point
     # Add obstacles avoidance
     def moveToPoint(self, point): # point is a tuple (x,y)
         print("Moving to point state")
-        newX = self.cell.coordinate[0]
-        newY = self.cell.coordinate[1]
-        if newX < point[0]:
-            newX = newX + 1
-        elif newX > point[0]:
-            newX = newX - 1
-        if newY < point[1]:
-            newY = newY + 1
-        elif newY > point[1]:
-            newY = newY - 1
-        self.cell = self.model.grid[newX, newY]
+        curr_x, curr_y = self.cell.coordinate
+
+        # Sign funcrion to determine direction
+        def sign(v): 
+            return 0 if v == 0 else (1 if v > 0 else -1)
+
+        # Check if coordinates are in grid bounds
+        def in_bounds(x, y):
+            return 0 <= x < self.model.width and 0 <= y < self.model.height
+
+        # Check if no obstacles in cell
+        def is_safe(cell):
+            return not any(isinstance(a, ObstacleAgent) for a in getattr(cell, 'agents', []))
+
+        dx = sign(point[0] - curr_x)
+        dy = sign(point[1] - curr_y)
+
+        # Build prioritized candidate moves, to optimize getting to point
+        candidates = []
+        primary = (curr_x + dx, curr_y + dy)
+        candidates.append(primary)
+
+        # Depending on which axis needs movement add preference
+        if dx != 0:
+            candidates.append((curr_x + dx, curr_y))
+        if dy != 0:
+            candidates.append((curr_x, curr_y + dy))
+
+        # Depending on vertical direction prefer top ot bottom cells
+        if dy != 0:
+            candidates.extend([
+                (curr_x - 1, curr_y + dy),
+                (curr_x + 1, curr_y + dy),
+            ])
+
+        # Depending on horizontal direction prefer left or right cells
+        if dx != 0:
+            candidates.extend([
+                (curr_x + dx, curr_y - 1),
+                (curr_x + dx, curr_y + 1),
+            ])
+
+        # Remove duplicate candidates
+        seen = set() # set is ude to keep track of visited coordinates
+        uniq_candidates = [] # Avoid duplicates 
+        for x, y in candidates:
+            if (x, y) not in seen: 
+                seen.add((x, y))
+                uniq_candidates.append((x, y))
+
+        # Pick the first safe candidate
+        for x, y in uniq_candidates:
+            if not in_bounds(x, y):
+                continue
+            cell = self.model.grid[x, y]
+            if is_safe(cell):
+                self.cell = cell
+                return
+
+        # If no candidates are safe, just choose a random safe neighbor
+        safe_neighbors = [
+            c for c in self.cell.neighborhood.select(lambda cell: True) if is_safe(c)
+        ]
+        if safe_neighbors:
+            # Prefer neighbors that move closer to the target, witgh Manhattan distance
+            def manh(c):
+                x, y = c.coordinate
+                return abs(x - point[0]) + abs(y - point[1]) # Manhattan distance
+
+            safe_neighbors.sort(key=manh)
+            self.cell = safe_neighbors[0]
+            return
+
+        # If no safe neighbors, do nothing
+        return
+
 
     def returning(self):
         print("Returning state")
@@ -233,13 +296,16 @@ class RandomAgent(CellAgent):
                 self.move()      
 
     def saveInfo(self):
-        # Save the agent's current position in the agentMap
-        # Look through all grid cells to find the charging station's position.
-        for cell in getattr(self.model, 'grid').all_cells:
-            for a in getattr(cell, 'agents', []):
-                if isinstance(a, ChargingStationAgent):
-                    self.agentMap['ChargingStation'] = a.cell.coordinate
-                    return
+        # Save the agent's current position in the agentMap if there is no charging station recorded
+        
+        if 'ChargingStation' in self.agentMap:
+            return
+        
+        for a in getattr(self.cell, 'agents', []):
+            if isinstance(a, ChargingStationAgent):
+                self.agentMap['ChargingStation'] = a.cell.coordinate
+                return
+
                 
     def noBattery(self):
         print("No battery state")

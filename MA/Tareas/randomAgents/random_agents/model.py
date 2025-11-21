@@ -30,6 +30,8 @@ class RandomModel(Model):
         model_reporters = {
             "RandomAgent": lambda m: sum(1 for a in m.agents if isinstance(a, RandomAgent)),
             "TrashAgent": lambda m: sum(1 for a in m.agents if isinstance(a, TrashAgent)),
+            # Steps left until forced stop
+            "StepsLeft": lambda m: max(0, getattr(m, 'max_steps', 0) - getattr(m, 'steps', 0)),
         }
 
         self.datacollector = DataCollector(model_reporters)
@@ -82,20 +84,32 @@ class RandomModel(Model):
             cell=charging_cell,
         )
 
+        self.steps = 0
+        self.max_steps = 1000
         
         self.running = True # Indicate that the model is running
 
     def step(self):
         '''Advance the model by one step.'''
+        # Stop if no trash remains
+        if sum(1 for a in self.agents if isinstance(a, TrashAgent)) == 0:
+            self.running = False
+            return
+
         self.agents.shuffle_do("step")
-        # collect model-level data for plotting
+
+        # Collect data
         try:
             self.datacollector.collect(self)
         except Exception:
             pass
 
+        # Increment step counter and stop if reached max
+        self.steps += 1
+        if self.steps >= getattr(self, 'max_steps', 1000):
+            self.running = False
+
     @staticmethod
     def count_type(model, typeAgent):
         """Helper method to count trees in a given condition in a given model."""
-        # Fallback helper: count agents by class name
         return sum(1 for a in model.agents if a.__class__.__name__ == typeAgent)
