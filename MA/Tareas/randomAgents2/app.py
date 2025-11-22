@@ -60,7 +60,7 @@ def post_process_lines(ax):
     ax.legend(loc="center left", bbox_to_anchor=(1, 0.9))
 
 lineplot_component = make_plot_component(
-    {"RandomAgent": "tab:red", "TrashAgent": "tab:green", "StepsLeft": "tab:blue"},
+    {"RandomAgent": "tab:red", "TrashAgent": "tab:green"},
     post_process=post_process_lines
 )
 

@@ -90,6 +90,13 @@ class RandomAgent(CellAgent):
                         self.cell = dest
                         self.batteryLevel -= 1
                         return
+                    else:
+                        safe_neighbors = [
+                            c for c in self.cell.neighborhood.select(lambda cell: cell.is_empty) if is_safe(c)
+                        ]
+                        if safe_neighbors:
+                            self.cell = self.random.choice(safe_neighbors)
+                            self.batteryLevel -= 1
                 else:
                     # Reached row 2
                     self.agentMap.pop('TargetRow2', None)
@@ -110,6 +117,13 @@ class RandomAgent(CellAgent):
                         if self.cell.coordinate[1] == target_row:
                             self.agentMap.pop('ReturnRow', None)
                         return
+                    else:
+                        safe_neighbors = [
+                            c for c in self.cell.neighborhood.select(lambda cell: cell.is_empty) if is_safe(c)
+                        ]
+                        if safe_neighbors:
+                            self.cell = self.random.choice(safe_neighbors)
+                            self.batteryLevel -= 1
 
             # Find neighboring cells that contain any TrashAgent and are safe
             trash_neighbors = [
@@ -125,10 +139,9 @@ class RandomAgent(CellAgent):
                     dest = self.model.grid[last_position]
                     if is_safe(dest):
                         self.cell = dest
-                        print(f"Moved to {self.cell.coordinate} while returning to last position before cleaning")
                         self.batteryLevel -= 1
                     else:
-                        # if last position is now blocked, pick another safe neighbor
+                        # If last position is now blocked, pick another safe neighbor
                         safe_neighbors = [
                             c for c in self.cell.neighborhood.select(lambda cell: cell.is_empty) if is_safe(c)
                         ]
@@ -146,18 +159,19 @@ class RandomAgent(CellAgent):
                 self.cleaning = True
                 # Move to the first safe neighbor that has trash
                 self.cell = trash_neighbors[0]
-                print(f"Moved to {self.cell.coordinate} while moving to trash")
                 self.batteryLevel -= 1
 
             else:
                 next_x = self.cell.coordinate[0] + self.direction
                 next_y = self.cell.coordinate[1]
 
+                # Check for top and bottom borders to reverse vertical direction
                 if next_y <= 2:
                     self.upDown = 1
                 elif next_y >= self.model.height - 3:
                     self.upDown = -1
                 
+                # Handle left and right borders
                 if next_x < 2 or next_x >= self.model.width - 2:
                     self.direction = -self.direction
                     newX = self.cell.coordinate[0]
@@ -201,8 +215,6 @@ class RandomAgent(CellAgent):
                                 else:
                                     self.cell = self.random.choice(safe_neighbors)
                                     self.batteryLevel -= 1   
-
-        print(f"Battery level: {self.batteryLevel}%")
 
         pass 
 
