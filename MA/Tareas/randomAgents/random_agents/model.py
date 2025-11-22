@@ -12,10 +12,10 @@ class RandomModel(Model):
         height, width: The size of the grid to model
         num_obstacles: Number of obstacle agents in the simulation
     """
-    def __init__(self, num_agents=10, num_obstacles=10, num_trash=10, width=8, height=8, seed=42):
+    def __init__(self, num_obstacles=10, num_trash=10, width=8, height=8, seed=42):
 
         super().__init__(seed=seed)
-        self.num_agents = num_agents
+        self.num_agents = 1
         self.num_obstacles = num_obstacles
         self.num_trash = num_trash
         # Track how many trash items have been collected so far
